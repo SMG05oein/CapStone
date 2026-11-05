@@ -45,7 +45,7 @@ jobs:
           PI_DEPLOY_PATH: ${{ secrets.PI_DEPLOY_PATH }}
         run: |
           set -euo pipefail
-          DEPLOY_PATH="${PI_DEPLOY_PATH:-/home/mrlee/CapStone}"
+          DEPLOY_PATH="${PI_DEPLOY_PATH:-/home/mrlee/Capstone_Design}"
           ssh -o StrictHostKeyChecking=yes \
             "${PI_USER}@${PI_HOST}" "mkdir -p '${DEPLOY_PATH}'"
           rsync -az --delete \

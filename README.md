@@ -215,7 +215,7 @@ git push -u origin feature/my-change
 | `PI_SSH_PRIVATE_KEY` | 배포용 SSH 개인키 전체 PEM |
 | `PI_HOST` | 파이 Tailscale IP (예: `100.65.108.86`) |
 | `PI_USER` | SSH 사용자 (예: `mrlee`) |
-| `PI_DEPLOY_PATH` | (선택) 배포 경로. 기본 `/home/mrlee/CapStone` |
+| `PI_DEPLOY_PATH` | (선택) 배포 경로. 기본 `/home/mrlee/Capstone_Design` |
 
 #### 1) Tailscale OAuth (CI용)
 
@@ -255,6 +255,7 @@ ssh-copy-id -i capstone_deploy.pub mrlee@100.65.108.86
 파이 쪽 `.env`는 최초 1회 수동 생성합니다. 배포가 `.env`를 덮어쓰지 않습니다.
 
 ```bash
-cp /home/mrlee/CapStone/.env.example /home/mrlee/CapStone/.env
+cp /home/mrlee/Capstone_Design/.env.example /home/mrlee/Capstone_Design/.env
 # DB_URL 등 수정
 ```
+
