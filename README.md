@@ -200,9 +200,12 @@ git push -u origin feature/my-change
 
 ### 6.2 main 배포 CI (GitHub Actions + Tailscale)
 
-`main` 푸시(또는 Actions에서 `workflow_dispatch`) 시 GitHub-hosted runner가 Tailscale에 붙고, 파이 Tailscale IP로 `rsync` 배포합니다. 워크플로 파일: `.github/workflows/deploy-main.yml`
+`main` 푸시(또는 Actions에서 `workflow_dispatch`) 시 워크플로가 돕니다. 파일: `.github/workflows/deploy-main.yml`
 
-파이가 꺼져 있거나 Tailscale/SSH가 안 되면 deploy job은 실패합니다. 파이 켠 뒤 **Re-run failed jobs** 또는 **Run workflow**로 다시 돌리면 됩니다. `.env`와 `*.pt`는 배포에서 제외합니다.
+1. **verify (A)**: `python -m compileall`로 문법 검사 후 `Back`/`Edge` requirements 설치·`pip check`
+2. **deploy (D)**: verify가 성공한 뒤에만 Tailscale로 파이(`PI_HOST`)에 `rsync` 배포
+
+파이가 꺼져 있거나 Tailscale/SSH가 안 되면 deploy job만 실패합니다. verify는 파이 전원과 무관합니다. 파이 켠 뒤 **Re-run failed jobs** 또는 **Run workflow**로 배포를 다시 돌리면 됩니다. `.env`와 `*.pt`는 배포에서 제외합니다.
 
 #### 필요한 GitHub Secrets
 

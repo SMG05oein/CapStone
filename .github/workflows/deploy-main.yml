@@ -10,8 +10,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            Back/requirements.txt
+            Edge/requirements.txt
+
+      - name: Compile Python sources
+        run: |
+          set -euo pipefail
+          python -m compileall -q Back Edge test json_receiver.py
+
+      - name: Install Back requirements
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r Back/requirements.txt
+
+      - name: Install Edge requirements
+        run: |
+          set -euo pipefail
+          python -m pip install -r Edge/requirements.txt
+
+      - name: Pip check
+        run: python -m pip check
+
   deploy:
     name: deploy-via-tailscale
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
