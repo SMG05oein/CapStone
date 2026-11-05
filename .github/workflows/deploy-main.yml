@@ -1,0 +1,64 @@
+name: Deploy main to Raspberry Pi
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main-pi
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy-via-tailscale
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Connect Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          ping: ${{ secrets.PI_HOST }}
+
+      - name: Setup SSH key
+        env:
+          PI_SSH_PRIVATE_KEY: ${{ secrets.PI_SSH_PRIVATE_KEY }}
+          PI_HOST: ${{ secrets.PI_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PI_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$PI_HOST" >> ~/.ssh/known_hosts
+
+      - name: Sync code to Raspberry Pi
+        env:
+          PI_HOST: ${{ secrets.PI_HOST }}
+          PI_USER: ${{ secrets.PI_USER }}
+          PI_DEPLOY_PATH: ${{ secrets.PI_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          DEPLOY_PATH="${PI_DEPLOY_PATH:-/home/mrlee/CapStone}"
+          ssh -o StrictHostKeyChecking=yes \
+            "${PI_USER}@${PI_HOST}" "mkdir -p '${DEPLOY_PATH}'"
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.env' \
+            --exclude '.venv/' \
+            --exclude 'venv/' \
+            --exclude '__pycache__/' \
+            --exclude '*.pt' \
+            --exclude '.idea/' \
+            --exclude '.cursor/' \
+            --exclude '.agents/' \
+            --exclude '_pi_import/' \
+            ./ "${PI_USER}@${PI_HOST}:${DEPLOY_PATH}/"
+          ssh -o StrictHostKeyChecking=yes "${PI_USER}@${PI_HOST}" \
+            "printf 'Deployed CapStone to %s at %s\n' '${DEPLOY_PATH}' \"\$(date -Iseconds)\""

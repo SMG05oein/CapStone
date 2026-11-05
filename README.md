@@ -198,12 +198,63 @@ git push -u origin feature/my-change
 # GitHub에서 PR → main
 ```
 
-### 6.2 main 배포 CI와 파이 전원 off
+### 6.2 main 배포 CI (GitHub Actions + Tailscale)
 
-`main` 푸시 배포는 파이가 켜져 있고 Tailscale/SSH가 닿을 때만 성공한다. 파이가 꺼져 있으면 배포 job은 실패하는 것이 정상이다. CD를 안 쓰는 전제에서는 아래 중 하나로 처리한다.
+`main` 푸시(또는 Actions에서 `workflow_dispatch`) 시 GitHub-hosted runner가 Tailscale에 붙고, 파이 Tailscale IP로 `rsync` 배포합니다. 워크플로 파일: `.github/workflows/deploy-main.yml`
 
-1. **권장**: CI를 `verify`(테스트/린트, 항상)와 `deploy`(SSH 배포, 파이 필요)로 나눈다. 파이 off면 deploy만 실패시키고, 파이 켠 뒤 Actions에서 **Re-run failed jobs** 또는 `workflow_dispatch`로 배포만 다시 돌린다.
-2. **셀프 호스티드 러너를 파이에 두면** 파이가 꺼진 동안 잡이 대기/미실행이 된다. 켜지면 그때 소화할 수 있으나, 러너 관리 부담이 생긴다.
-3. **파이 부팅 시 `git pull`** 은 간편하지만 pull 기반 동기화에 가깝고, 이번 범위의 “CD 없음 + main 푸시 CI 배포”와는 역할이 겹친다.
+파이가 꺼져 있거나 Tailscale/SSH가 안 되면 deploy job은 실패합니다. 파이 켠 뒤 **Re-run failed jobs** 또는 **Run workflow**로 다시 돌리면 됩니다. `.env`와 `*.pt`는 배포에서 제외합니다.
 
-정리: 파이 off는 막으려 하기보다, 배포 job 실패를 허용하고 온라인일 때 재실행하는 쪽이 단순하다.
+#### 필요한 GitHub Secrets
+
+저장소 → Settings → Secrets and variables → Actions 에 추가합니다.
+
+| Secret | 내용 |
+| :--- | :--- |
+| `TS_OAUTH_CLIENT_ID` | Tailscale OAuth client id |
+| `TS_OAUTH_SECRET` | Tailscale OAuth client secret |
+| `PI_SSH_PRIVATE_KEY` | 배포용 SSH 개인키 전체 PEM |
+| `PI_HOST` | 파이 Tailscale IP (예: `100.65.108.86`) |
+| `PI_USER` | SSH 사용자 (예: `mrlee`) |
+| `PI_DEPLOY_PATH` | (선택) 배포 경로. 기본 `/home/mrlee/CapStone` |
+
+#### 1) Tailscale OAuth (CI용)
+
+1. [Tailscale Admin → Trust credentials / OAuth clients](https://login.tailscale.com/admin/settings/oauth) 에서 OAuth client 생성
+2. 권한에 Devices Core write, 필요 시 Keys 관련 권한 포함
+3. 태그 `tag:ci` 를 쓸 수 있게 ACL에 CI 태그 허용
+4. 발급된 client id/secret을 `TS_OAUTH_*` 시크릿에 넣기
+
+ACL 예시(팀 정책에 맞게 조정):
+
+```json
+{
+  "tagOwners": {
+    "tag:ci": ["autogroup:admin"]
+  },
+  "grants": [
+    {
+      "src": ["tag:ci"],
+      "dst": ["*"],
+      "ip": ["22"]
+    }
+  ]
+}
+```
+
+#### 2) 배포용 SSH 키
+
+로컬에서 키 생성 후, 공개키를 파이 `~/.ssh/authorized_keys`에 넣고 개인키만 GitHub 시크릿에 넣습니다.
+
+```bash
+ssh-keygen -t ed25519 -f capstone_deploy -N ""
+# 공개키 → 파이
+ssh-copy-id -i capstone_deploy.pub mrlee@100.65.108.86
+# 개인키 내용 전체를 PI_SSH_PRIVATE_KEY 시크릿에 붙여넣기
+```
+
+파이 쪽 `.env`는 최초 1회 수동 생성합니다. 배포가 `.env`를 덮어쓰지 않습니다.
+
+```bash
+cp /home/mrlee/CapStone/.env.example /home/mrlee/CapStone/.env
+# DB_URL 등 수정
+```
